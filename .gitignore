@@ -1,0 +1,15 @@
+# Python virtual environment (only this)
+src/env/
+
+# Vivado project files: ignore everything under Vivado/, except user/ (IP core source)
+/Vivado/*
+!/Vivado/user/
+!/Vivado/user/**
+
+# Tool
+/Tool/iverilog/
+/FilterProDTSetup/
+
+# simulink
+/Simulink/*
+!/Simulink/*.slx
