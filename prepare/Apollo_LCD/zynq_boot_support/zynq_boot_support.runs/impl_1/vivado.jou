@@ -1,0 +1,24 @@
+#-----------------------------------------------------------
+# Vivado v2025.1 (64-bit)
+# SW Build 6140274 on Thu May 22 00:12:29 MDT 2025
+# IP Build 6138677 on Thu May 22 03:10:11 MDT 2025
+# SharedData Build 6139179 on Tue May 20 17:58:58 MDT 2025
+# Start of session at: Tue Jul 14 21:57:05 2026
+# Process ID         : 300896
+# Current directory  : E:/Apollo_LCD/zynq_boot_support/zynq_boot_support.runs/impl_1
+# Command line       : vivado.exe -log mizar_ps_wrapper.vdi -applog -product Vivado -messageDb vivado.pb -mode batch -source mizar_ps_wrapper.tcl -notrace
+# Log file           : E:/Apollo_LCD/zynq_boot_support/zynq_boot_support.runs/impl_1/mizar_ps_wrapper.vdi
+# Journal file       : E:/Apollo_LCD/zynq_boot_support/zynq_boot_support.runs/impl_1\vivado.jou
+# Running On         : LAPTOP-T0SQ4O44
+# Platform           : Windows Server 2016 or Windows 10
+# Operating System   : 26100
+# Processor Detail   : 13th Gen Intel(R) Core(TM) i5-13500HX
+# CPU Frequency      : 2688 MHz
+# CPU Physical cores : 14
+# CPU Logical cores  : 20
+# Host memory        : 16886 MB
+# Swap memory        : 51539 MB
+# Total Virtual      : 68425 MB
+# Available Virtual  : 14030 MB
+#-----------------------------------------------------------
+source mizar_ps_wrapper.tcl -notrace

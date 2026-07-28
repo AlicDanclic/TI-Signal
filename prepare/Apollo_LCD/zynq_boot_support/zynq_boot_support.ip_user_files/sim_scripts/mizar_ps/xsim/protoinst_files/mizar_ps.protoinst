@@ -1,0 +1,9 @@
+{
+	"version": "1.0",
+	"modules": {
+		"mizar_ps": {
+			"proto_instances": {
+			}
+		}
+	}
+}
