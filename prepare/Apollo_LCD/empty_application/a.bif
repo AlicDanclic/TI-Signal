@@ -1,0 +1,7 @@
+//arch = zynq; split = false; format = BIN
+the_ROM_image:
+{
+	[bootloader]E:\Apollo_LCD\platform\export\platform\sw\boot\fsbl.elf
+	E:\Apollo_LCD\second\second\PhasedArrayUltrasonic\PhasedArrayUltrasonic\PhasedArrayUltrasonic.runs\impl_1\top_ad_da_uart.bit
+	E:\Apollo_LCD\empty_application\build\empty_application.elf
+}
