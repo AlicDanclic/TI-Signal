@@ -1,0 +1,12 @@
+#-----------------------------------------------------------
+# Vivado v2020.2 (64-bit)
+# SW Build 3064766 on Wed Nov 18 09:12:45 MST 2020
+# IP Build 3064653 on Wed Nov 18 14:17:31 MST 2020
+# Start of session at: Thu Oct 23 11:49:00 2025
+# Process ID: 2008
+# Current directory: G:/davinci/doc_check/33_hs_dual_ad/prj/hs_dual_ad.runs/synth_1
+# Command line: vivado.exe -log hs_dual_ad.vds -product Vivado -mode batch -messageDb vivado.pb -notrace -source hs_dual_ad.tcl
+# Log file: G:/davinci/doc_check/33_hs_dual_ad/prj/hs_dual_ad.runs/synth_1/hs_dual_ad.vds
+# Journal file: G:/davinci/doc_check/33_hs_dual_ad/prj/hs_dual_ad.runs/synth_1\vivado.jou
+#-----------------------------------------------------------
+source hs_dual_ad.tcl -notrace
