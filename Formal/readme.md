@@ -108,17 +108,123 @@
 请务必一次性按上述顺序输出全部七部分内容，各部分之间使用一级标题（###）分隔。若赛题中部分信息缺失，可基于电赛常规做法进行合理假设，并在该处注明假设内容。
 ````
 
+## 项目简介
+
+2026 年全国大学生电子设计竞赛（江苏赛区 TI 杯）F 题——李萨如图形显示控制装置。题目原文见根目录 [李萨如图形显示控制装置（F题）.pdf](李萨如图形显示控制装置（F题）.pdf)。
+
+装置接收信号源输出的正弦信号（1kHz~100kHz，步进 100Hz），经数字处理后送至示波器 Y 轴，控制 X-Y 模式下的李萨如图形：直通对角线、正交圆、二倍频"∞"形、四档程控幅度；自动模式下断开装置与信号源的电气连接，通过摄像头观测示波器屏幕，视觉闭环一键完成上述图形的自动控制。
+
 ## 系统架构
 
+![系统总体架构](Bitmap/system_architecture.png)
 
+系统由四个子系统构成：
+
+| 子系统 | 硬件 | 职责 |
+|---|---|---|
+| 信号处理核心 | Zynq-7020 PL（Mizar Z7，50MHz） | 等精度测频、181 点波形捕获、DDS 正弦合成、数字移相、二倍频、程控幅度 |
+| 模拟链路 | 3PA1030 ADC（双通道 10bit/50MSPS）+ 3PD5651E DAC（双通道 10bit） | 输入调理采样与输出重建缓冲 |
+| 人机交互 | STM32F429IGT6（Apollo 开发板，4.3 寸触摸屏） | 波形监视副屏（频率/峰峰值/有效值）、三键启动、LED+蜂鸣器声光提示、Pi↔FPGA 命令转发 |
+| 视觉闭环 | 树莓派 + 摄像头（720p@30，V4L2） | 屏幕轨迹提取、椭圆拟合 / Chamfer 匹配、非阻塞控制状态机 |
+
+数据通路：
+
+- 遥测链路：FPGA →（UART 115200，247B 帧 `A5 5A 02` + CRC16）→ STM32 波形显示；
+- 闭环链路：摄像头 → 树莓派 →（16B 命令帧 `A5 5A 51` + CRC16）→ STM32（USART2）→（USART1 转发）→ FPGA；
+- 启动链路：Zynq PS 从 SD 卡 `BOOT.bin`（FSBL + PL 位流 + 空应用）完成 PL 逻辑加载。
+
+### 四种工作模式
+
+![四种工作模式与李萨如原理](Bitmap/signal_modes.png)
+
+### 自动模式（要求 5）视觉闭环
+
+![自动模式视觉闭环状态机](Bitmap/auto_control_flow.png)
+
+断开信号源与装置的连接后，摄像头观测示波器屏幕：FPGA 先输出锯齿 / 双细条探针波形供视觉粗测频、精测相；随后下发目标参数（目标号、幅度码、相位码、32 位 DDS 调谐字）。圆目标经分层扫频进入相位、幅度、频率积分三环伺服；直线 / ∞ 目标经 Chamfer 匹配双向试探收敛。锁定后上报 STM32 触发声光提示，并持续复查维护稳定。
 
 ## 实物展示
 
-
+> 待补充：整机实物、示波器显示效果照片（建议放入 `Bitmap/` 后在此引用）。
 
 ## 关键指标
 
+### 赛题指标
 
+| 项目 | 指标 | 分值 |
+|---|---|---|
+| 输入频率范围 | 1kHz ~ 100kHz，步进 100Hz（频点不得在装置中预设） | — |
+| 幅度误差 | 绝对值 ≤ 0.2div（X/Y 灵敏度 0.5V/div） | — |
+| 要求 1 直通 | 8×8div 矩形对角线 | 5 |
+| 要求 2 正交圆 | 直径 8div，输出与输入相位正交、幅度相等 | 15 |
+| 要求 3 二倍频 | 水平 ∞ 形，上下左右对称 | 25 |
+| 要求 4 程控幅度 | Y 峰峰 2/4/6/8 div 四档 | 15 |
+| 要求 5 自动模式 | 一键启动，控制时间 ≤10s，稳定时间 ≥5s，完成后声光提示 | 40 |
+
+### 系统指标
+
+| 模块 | 指标 |
+|---|---|
+| ADC / DAC | 双通道 10bit / 50MSPS，50MHz 同源时钟 |
+| DDS | 32 位调谐字，频率分辨率 50MHz/2³² ≈ 0.012Hz，严格对齐 100Hz 赛题网格 |
+| 测频 | 1s 闸门等精度测频，3 个一致周期锁定（容差 1/8 周期） |
+| 波形遥测 | 181 点 × 10bit，自适应抽取，25 帧/s，CRC16-CCITT 校验 |
+| 视觉识别 | HSV 轨迹提取 + 形态学去网格；椭圆拟合 36bin 覆盖率 + 径向 MAD；锁定门限 quality≥70、轴比 ≤1.25 |
+| 闭环伺服 | 相位死区 4 码 / 增益 0.8，幅度增益 0.35，频率积分 ≤0.5Hz/步（累计 ≤5Hz，补偿晶振误差），锁定后 0.25s 复查维护 |
 
 ## 关键代码
+
+```text
+Software/
+├── 01_STM32/Apollo_LCD/              # STM32F429 人机交互（CubeMX + EIDE）
+│   └── Core/Src/
+│       ├── main.c                    # 启动编排与主循环（10ms 触摸 / 40ms 波形刷新）
+│       ├── waveform.c                # 示波器 UI：差分局部刷新、FREQ/VPP/RMS 测量、游标与时基缩放
+│       ├── usart.c                   # FPGA 帧协议解析（环形缓冲、CRC16、链路统计）
+│       └── lcd.c / touch.c           # 4.3 寸 800×480 LCD（FMC）与电容触摸（软件 I2C）
+├── 02_FPGA/Vivado_ADDA_scope/        # Zynq-7020 PL 逻辑（Vivado 2025.1）
+│   └── PhasedArrayUltrasonic.srcs/sources_1/new/
+│       ├── top.v                     # 顶层：AD→DA 通路、时钟同源转发、LED 状态
+│       ├── adda_data_path.v          # AD 总线 IOB 打拍与 DA 输出
+│       ├── adc_monitor_capture.v     # 中值滤波、施密特测频、自适应抽取波形捕获
+│       ├── wave_uart_frame_tx.v      # 247B 遥测帧组帧 + CRC16 发送
+│       └── uart_tx.v / uart_rx.v     # 通用 UART 收发（115200 8N1）
+├── 03_Zynq_boot/                     # SD 卡启动镜像（FSBL + PL 位流 + 空应用）
+│   └── boot/BOOT.bin                 # 由 zynq_scope.bif 打包，拷入 SD 卡 FAT 分区即用
+└── 05_RaspberryPi/raspberry_pi_vision/
+    ├── task5_cv_single.py            # 视觉闭环单文件部署版（CV-R24）
+    ├── config.yaml                   # 现场配置：ROI、HSV、扫频 / 锁定参数
+    └── versions/                     # 关键演进快照（r21、r23；当前部署版为根目录 R24）
+```
+
+自动模式串口命令（树莓派 → STM32 → FPGA，16B 帧 `A5 5A 51` + CRC16）：
+
+| 命令 | 功能 |
+|---|---|
+| `PROBE_SINGLE 0x10` / `PROBE_DUAL 0x11` | 锯齿 / 双细条探针输出，用于视觉粗测频、精测相 |
+| `TARGET 0x20` | 下发目标号、幅度码、相位码（0~255）、32 位 DDS 调谐字 |
+| `STATUS_LOCKED 0x81` | 锁定上报（目标、质量、频率 mHz），STM32 触发声光提示 |
+
+> 注：仓库中 FPGA / STM32 源码为阶段性快照；闭环相关的部署版逻辑（DDS 目标输出、探针波形、按键与蜂鸣器）以 `Software/05_RaspberryPi/raspberry_pi_vision/README.md` 的协议描述为准。
+
+## 复现与构建
+
+- **FPGA**：`cd Software/02_FPGA/Vivado_ADDA_scope && vivado -source build_ad_da_scope_standalone.tcl`，产物为 `build_outputs/top_ad_da_uart.bit`
+- **Zynq 启动**：将 `Software/03_Zynq_boot/boot/BOOT.bin` 拷入 SD 卡 FAT 分区，Mizar Z7 设置为 SD 启动
+- **STM32**：`Software/01_STM32/Apollo_LCD` 使用 VS Code + EIDE（arm-none-eabi）构建烧录
+- **树莓派**：`cd Software/05_RaspberryPi/raspberry_pi_vision && python3 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt && python3 task5_cv_single.py --preview`
+- **架构图重导出**：`.drawio` 源文件位于 `Doc/drawio/`，可用 draw.io 直接编辑；或修改 `Doc/drawio/render_diagrams.py` 后运行 `python3 Doc/drawio/render_diagrams.py`，同步重新生成 drawio + PNG（依赖 Pillow：`python3 -m pip install pillow`）
+
+## 目录结构
+
+| 目录 | 内容 |
+|---|---|
+| `Bitmap/` | 架构图 PNG（由 drawio 同源脚本渲染导出） |
+| `Doc/drawio/` | 架构图 drawio 源文件与渲染脚本 |
+| `Software/01_STM32` | STM32F429 人机交互工程 |
+| `Software/02_FPGA` | Zynq PL 逻辑工程（Vivado 2025.1） |
+| `Software/03_Zynq_boot` | SD 卡启动镜像与 FSBL 工程 |
+| `Software/05_RaspberryPi` | 视觉闭环（含版本演进快照与协议文档） |
+| `Hardware/`, `3D/` | 硬件与结构文件（待补充） |
+| `Log/` | 竞赛日志 |
 

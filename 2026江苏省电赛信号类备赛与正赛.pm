@@ -7,7 +7,7 @@
     "template": "default",
     "color": "#4f46e5",
     "created_at": "2026-07-09T08:22:27.258Z",
-    "updated_at": "2026-07-21T14:48:42.239Z",
+    "updated_at": "2026-08-03T03:05:40.475Z",
     "archived": false,
     "start_date": "2026-07-09",
     "end_date": "2026-08-10",
@@ -42,7 +42,7 @@
       "id": "41865378-f2cf-4013-bd67-b9f344e8ac6e",
       "title": "Readme文档审阅",
       "description": "",
-      "status": "todo",
+      "status": "done",
       "priority": "low",
       "tags": [],
       "due_date": "2026-07-28",
@@ -54,13 +54,13 @@
       "tracked_start": null,
       "reminder": null,
       "created_at": "2026-07-09T08:25:32.899Z",
-      "updated_at": "2026-07-09T08:25:47.575Z"
+      "updated_at": "2026-08-03T03:05:40.474Z"
     },
     {
       "id": "440cc594-21a1-42d8-a488-fd144abeb346",
       "title": "电赛正式比赛",
       "description": "",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "tags": [],
       "due_date": "2026-08-01",
@@ -85,7 +85,7 @@
       "tracked_start": null,
       "reminder": null,
       "created_at": "2026-07-09T08:26:20.313Z",
-      "updated_at": "2026-07-09T08:47:37.366Z"
+      "updated_at": "2026-08-03T03:05:39.662Z"
     },
     {
       "id": "8fac6819-3abc-460b-a937-207982701730",
@@ -186,7 +186,7 @@
       "id": "83ad93ef-7713-408b-bddf-d150682c1be5",
       "title": "Simulink模拟代码生成",
       "description": "",
-      "status": "todo",
+      "status": "done",
       "priority": "medium",
       "tags": [],
       "due_date": "2026-07-28",
@@ -198,7 +198,7 @@
       "tracked_start": null,
       "reminder": null,
       "created_at": "2026-07-09T08:47:12.986Z",
-      "updated_at": "2026-07-09T08:47:19.422Z"
+      "updated_at": "2026-08-03T03:05:37.070Z"
     },
     {
       "id": "c5e51a61-435d-4723-bcfa-213e90546951",
@@ -314,6 +314,21 @@
       "version": "1.0.16",
       "date": "2026-07-21",
       "info": "任务「硬件仿真与准备」状态变更为已完成"
+    },
+    {
+      "version": "1.0.17",
+      "date": "2026-08-03",
+      "info": "任务「Simulink模拟代码生成」状态变更为已完成"
+    },
+    {
+      "version": "1.0.18",
+      "date": "2026-08-03",
+      "info": "任务「电赛正式比赛」状态变更为已完成"
+    },
+    {
+      "version": "1.0.19",
+      "date": "2026-08-03",
+      "info": "任务「Readme文档审阅」状态变更为已完成"
     }
   ],
   "milestones": []

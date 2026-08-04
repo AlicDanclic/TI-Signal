@@ -1,0 +1,408 @@
+serial:
+  port: /dev/serial0
+  baudrate: 115200
+
+# The Pi waits for STM32's mapped FPGA ACK before it starts a capture window.
+# The retry keeps the same sequence and payload, setting FLAG_RETRY on wire.
+protocol:
+  ack_timeout_s: 0.60
+  ack_retries: 3
+  emit_progress_status: false
+
+camera:
+  device: 0
+  width: 1280
+  height: 720
+  fps: 30
+  auto_exposure: 1
+  # Normalized screen rectangle [x, y, width, height]. Adjust on site.
+  roi: [0.12, 0.08, 0.76, 0.84]
+  # For an oblique camera, replace roi with four pixel points ordered TL,TR,BR,BL:
+  # perspective_points: [[100, 80], [1180, 90], [1170, 650], [110, 640]]
+
+vision:
+  canonical_size: [640, 480]
+  # Default covers green/yellow oscilloscope traces. Tune with HSV if necessary.
+  hsv_low: [25, 60, 90]
+  hsv_high: [100, 255, 255]
+  brightness_threshold: 165
+  minimum_trace_pixels: 150
+  phase_search_step: 4
+  # Legacy offline extract_points.py settings only. The runtime controller
+  # uses TraceExtractor, and opencv_main.py uses fixed camera calibration.
+  point_extraction:
+    # The two Task5 idle lines are detected as +2 V / -2 V references and
+    # removed before the remaining pulse-ramp samples are located.
+    reference_search_fraction: 0.35
+    reference_margin_px: 8
+    horizontal_crop_fraction: 0.05
+    activity_fraction: 0.04
+    peak_floor_percentile: 58
+    profile_percentile: 85
+    maximum_points: 64
+    minimum_points: 5
+    # Reject dark grid edges even if local contrast enhancement makes them
+    # look bright in the high-pass image.
+    minimum_green_excess: 30
+    minimum_brightness: 155
+    minimum_reference_green_excess: 35
+    minimum_reference_contrast: 12
+    minimum_reference_confidence: 0.55
+
+probe:
+  low_cycle_threshold: 1.5
+  high_cycle_threshold: 8.0
+  dual_offset_us: 7000
+  minimum_confidence: 0.35
+
+# The coarse controller feeds the proven fixed-camera point extractor one
+# frame at a time. Statistics are calculated across the one-second window;
+# frames are never merged into a cumulative point cloud.
+coarse:
+  widths: [0, 1, 2]
+  calculation_widths_us: {"0": 100, "1": 500, "2": 2000}
+  settle_s: 0.18
+  capture_seconds: 1.0
+  screen_size: [640, 512]
+  extract_maximum_points: 32
+  minimum_points: 5
+  minimum_complete_periods: 3
+  # Field captures are often exactly 2/3 valid frames; retain the robust
+  # median/MAD checks and accept that stable evidence.
+  minimum_valid_ratio: 0.60
+  maximum_cv: 0.08
+  minimum_confidence: 0.10
+  maximum_points: 22
+  cross_width_frequency_tolerance: 0.20
+  w2_low_frequency_max_hz: 8000
+  w2_maximum_raw_turns: 22
+  # Preserve the full 2 ms scan for low frequencies. Once a dense, stable
+  # high-frequency stage is accepted, use the saved time for DDS searching.
+  early_stop_on_matched_points: true
+  early_stop_min_frequency_hz: 8000
+
+fine_phase:
+  settle_s: 0.18
+  frames_per_block: 3
+  required_blocks: 3
+  maximum_frame_attempts: 36
+  maximum_rounds: 3
+  minimum_fit_confidence: 0.35
+  block_phase_tolerance_cycles: 0.08
+  block_frequency_tolerance_hz: 20.0
+  coarse_uncertainty_hz: 450.0
+  maximum_residual_cycles: 0.08
+
+target:
+  initial_amplitude:
+    "1": 103
+    "2": 103
+    "3": 103
+  initial_phase: 0
+  # FPGA amplitude 103 is the calibrated approximately +/-2 V DDS level.
+  # Phase code 64 is 90 degrees for the circle target.
+  circle_initial_amplitude: 103
+  circle_initial_phase: 64
+  amplitude_min: 96
+  initial_corrections: 2
+  maximum_corrections: 8
+  lock_quality: 65
+  # Covers coarse capture, tiered sweep, verification and initial correction.
+  # Once locked, continuous maintenance is exempt from this timeout.
+  control_timeout_s: 75.0
+  # Retained for compatibility with older saved configurations; CV-R11 does
+  # not freeze a lock after this interval.
+  stability_seconds: 5.2
+  freeze_after_lock: true
+
+  # Target geometry uses a full-CRT calibration independent of the pulse-ramp
+  # pixel/time calibration used by coarse measurement.
+  trace_extraction:
+    calibration_frame_size: [640, 480]
+    screen_corners: [[18, 18], [565, 17], [564, 447], [17, 447]]
+    screen_size: [640, 512]
+    green_percentile: 95.0
+    green_otsu_margin: 24
+    maximum_percentile_drop: 12
+    minimum_green: 170
+    local_background_sigma_px: 9.0
+    minimum_local_green_contrast: 8
+    border_px: 2
+    close_kernel_px: 5
+    open_kernel_px: 2
+    minimum_component_pixels: 60
+    minimum_component_area_ratio: 0.025
+
+  tracking_lock:
+    lock_quality: 72
+    lock_quality_by_target: {"1": 72, "3": 68}
+    maximum_desired_score: 0.030
+    quick_lock_enabled: true
+    quick_lock_quality: 60
+    quick_lock_quality_by_target: {"1": 60, "3": 58}
+    quick_lock_maximum_desired_score: 0.070
+    quick_lock_phase_deadband: 12
+    phase_deadband: 3
+    # Line/eight can start about 90 degrees away from their desired phase.
+    # Try the full measured error in both directions; small ±16-code circle
+    # steps are too slow and produce no measurable improvement that far away.
+    phase_proportional_gain: 1.0
+    phase_maximum_step: 96
+    phase_trial_minimum_improvement: 0.015
+    minimum_span_div: 6.0
+    maximum_span_div: 9.6
+    maximum_center_error_div: 1.0
+    correction_minimum_span_div: 2.5
+    correction_maximum_span_div: 9.8
+    correction_maximum_center_error_div: 1.5
+    servo_score_full_scale: 0.070
+    servo_span_error_full_scale_div: 2.0
+
+  circle_sweep:
+    step_hz: 100.0
+    # All tiers remain on the contest's 100 Hz grid. A wider tier is entered
+    # only if the preceding tier has no unique, repeatable candidate.
+    tier_radii_hz: [300.0, 800.0, 1500.0]
+    # High-frequency measurement is now normally within about 1 kHz. Search
+    # the real 100 Hz contest grid directly; a 500 Hz sparse grid can skip the
+    # true frequency residue and never produce a stationary seed.
+    high_frequency_threshold_hz: 25000.0
+    high_frequency_positive_first: true
+    high_frequency_screen_step_hz: 100.0
+    high_frequency_tier_radii_hz: [500.0, 1000.0, 2000.0, 3000.0, 4500.0]
+    high_frequency_required_positive_search_hz: 4500.0
+    # Compatibility radius used by standalone ranking/tests.
+    radius_hz: 1500.0
+    minimum_hz: 1000.0
+    maximum_hz: 100000.0
+    # The first post-command camera frame is flushed by require_frame_after().
+    settle_s: 0.18
+    screen_settle_s: 0.18
+    # Dense high-frequency candidates leave stronger CRT persistence. Flush it
+    # before collecting four frames over a wider, non-periodic time window.
+    high_frequency_screen_settle_s: 0.30
+    validation_settle_s: 0.18
+    hold_settle_s: 0.20
+    # Once a 100 Hz-grid ellipse is found, compensate the FPGA oscillator with
+    # sub-hertz tuning words. Displayed/contest frequency remains on the grid.
+    micro_settle_s: 0.18
+    micro_offsets_hz: [0.0, 2.0, -2.0, 1.0, -1.0, 0.5, -0.5, 0.25, -0.25]
+    micro_frames: 5
+    micro_minimum_frames: 3
+    micro_maximum_frame_attempts: 8
+    micro_minimum_aggregate_pixels: 120
+    micro_frame_intervals_s: [0.053, 0.079, 0.047, 0.071]
+    frames_per_candidate: 3
+    maximum_frame_attempts: 5
+    screen_frames_per_candidate: 3
+    screen_minimum_frames: 2
+    screen_maximum_frame_attempts: 5
+    screen_minimum_aggregate_pixels: 80
+    screen_minimum_quality: 35
+    # Non-10-ms interval patterns prevent a 100 Hz beat from repeatedly being
+    # sampled at the same apparent phase.
+    screen_frame_intervals_s: [0.037, 0.061, 0.043]
+    high_frequency_screen_frames_per_candidate: 4
+    high_frequency_screen_minimum_frames: 3
+    high_frequency_screen_maximum_frame_attempts: 7
+    high_frequency_screen_minimum_aggregate_pixels: 100
+    high_frequency_screen_frame_intervals_s: [0.071, 0.113, 0.089]
+    high_frequency_seed_maximum_foreground_occupancy: 0.11
+    high_frequency_seed_minimum_union_stability: 0.45
+    grid_settle_s: 0.16
+    grid_frames: 3
+    grid_minimum_frames: 2
+    grid_maximum_frame_attempts: 5
+    grid_minimum_aggregate_pixels: 100
+    grid_frame_intervals_s: [0.041, 0.067, 0.053]
+    validation_frames: 5
+    validation_minimum_frames: 3
+    validation_maximum_frame_attempts: 8
+    validation_minimum_aggregate_pixels: 120
+    validation_frame_intervals_s: [0.037, 0.061, 0.043, 0.067]
+    validation_candidate_count: 5
+    validation_maximum_reanchors: 1
+    validation_minimum_anchor_visits: 2
+    validation_minimum_quality: 48
+    validation_minimum_overlap: 0.18
+    validation_minimum_thinness: 0.22
+    validation_maximum_score_spread: 0.12
+    validation_minimum_score_margin: 0.015
+    hold_frames: 7
+    hold_minimum_frames: 5
+    hold_maximum_frame_attempts: 10
+    hold_minimum_aggregate_pixels: 120
+    hold_frame_intervals_s: [0.113, 0.149, 0.097, 0.137, 0.089, 0.163]
+    hold_minimum_quality: 52
+    hold_minimum_overlap: 0.20
+    hold_minimum_thinness: 0.22
+    # Frequency lock uses stationarity/thinness and does not assume the
+    # unknown initial phase already forms a circle.
+    trace_minimum_pixels: 40
+    trace_minimum_frames: 2
+    trace_minimum_aggregate_pixels: 0
+    # 0.22 is a quality target. Only components below the 0.04 hard floor are
+    # rejected, because a correct high-frequency trace can be split into arcs.
+    trace_minimum_extent_fraction: 0.18
+    trace_hard_minimum_extent_fraction: 0.04
+    trace_component_minimum_pixels: 12
+    trace_component_minimum_area_ratio: 0.02
+    trace_thickness_full_scale_px: 36.0
+    trace_overlap_dilation_px: 3
+    # Reject the filled probe lattice and simultaneous horizontal/vertical CRT
+    # frame strokes before they can enter SCREEN, HOLD or CONFIRM.
+    artifact_maximum_bbox_occupancy: 0.25
+    artifact_minimum_bidirectional_span_fraction: 0.18
+    artifact_axis_line_minimum_span_fraction: 0.28
+    minimum_trace_quality: 64
+    # Acquisition accepts an ellipse, not only an already-correct circle. Both
+    # axes must span the screen so a thin grid reflection cannot become anchor.
+    seed_minimum_span_div: 2.0
+    strong_seed_minimum_span_div: 3.0
+    seed_span_full_scale_div: 5.0
+    # For the circle target, prefer a complete ellipse/circle over a slightly
+    # thinner stationary arc. Other targets retain the stationarity score.
+    candidate_trace_weight: 0.50
+    candidate_bilateral_weight: 0.20
+    candidate_geometry_weight: 0.30
+    candidate_coverage_full_scale: 0.75
+    seed_minimum_trace_quality: 18
+    strong_seed_minimum_trace_quality: 42
+    strong_seed_minimum_overlap: 0.15
+    strong_seed_minimum_thinness: 0.08
+    strong_seed_minimum_shape_quality: 58
+    seed_minimum_pixels: 80
+    seed_minimum_aggregate_pixels: 120
+    seed_minimum_angular_coverage: 0.32
+    strong_seed_minimum_angular_coverage: 0.48
+    seed_maximum_radial_cv: 0.42
+    seed_maximum_inner_fill_ratio: 0.58
+    seed_maximum_fill_ratio: 0.90
+    minimum_trace_score_margin: 0.035
+    reject_boundary_best: true
+    minimum_quality: 60
+    minimum_score_margin: 0.025
+
+  circle_lock:
+    # Use the same fixed-camera rectification size as coarse point detection.
+    screen_size: [640, 512]
+    settle_s: 0.38
+    minimum_pixels: 80
+    # R19: inspect one fresh frame per 100 Hz candidate. A clean ellipse is
+    # latched for this run; later bad confirmation frames cannot restart SCREEN.
+    fast_single_frame_enabled: true
+    fast_seed_minimum_pixels: 80
+    fast_seed_minimum_span_div: 2.0
+    fast_seed_maximum_axis_ratio: 2.50
+    fast_seed_maximum_radial_cv: 0.45
+    fast_seed_maximum_inner_fill_ratio: 0.22
+    fast_seed_maximum_occupancy: 0.18
+    fast_lock_maximum_axis_ratio: 1.35
+    fast_lock_maximum_span_delta_div: 0.80
+    quick_lock_enabled: true
+    quick_lock_quality: 58
+    quick_lock_maximum_axis_ratio: 1.70
+    quick_lock_maximum_center_error_div: 1.50
+    quick_lock_maximum_occupancy: 0.20
+    fast_maximum_frame_attempts: 2
+    fast_confirmation_interval_s: 0.12
+    angle_bins: 36
+    radial_cv_full_scale: 0.22
+    coverage_full_scale: 0.86
+    inner_fill_full_scale: 0.30
+    target_fill_ratio: 0.16
+    extra_fill_full_scale: 0.45
+    aspect_error_full_scale: 0.22
+    axis_ratio_full_scale: 5.0
+    size_error_full_scale_div: 2.5
+    center_error_full_scale_div: 1.4
+    lock_quality: 70
+    maximum_span_delta_div: 0.45
+    minimum_span_div: 6.0
+    maximum_span_div: 9.4
+    maximum_center_error_div: 1.0
+    maximum_radial_cv: 0.20
+    maximum_axis_ratio: 1.25
+    maximum_inner_fill_ratio: 0.32
+    maximum_fill_ratio: 0.35
+    minimum_angular_coverage: 0.62
+    # A visible, stable ellipse may be captured as several arcs. Allow it to
+    # enter A/B control; the strict 0.62 final-lock gate remains unchanged.
+    correction_minimum_angular_coverage: 0.28
+    correction_maximum_radial_cv: 0.28
+    correction_maximum_inner_fill_ratio: 0.38
+    correction_maximum_fill_ratio: 0.65
+    correction_minimum_span_div: 2.5
+    correction_minimum_trace_quality: 48
+    correction_minimum_trace_overlap: 0.15
+    correction_minimum_trace_thinness: 0.20
+    # A correct-frequency circle may initially be a diagonal line. Permit that
+    # clean model seed to start A/B phase trials, while rejecting glare/fill.
+    phase_seed_maximum_model_score: 0.055
+    phase_seed_maximum_foreground_occupancy: 0.25
+    phase_seed_minimum_span_div: 2.5
+    phase_seed_maximum_span_div: 9.8
+    phase_seed_maximum_center_error_div: 1.5
+    frames_per_block: 5
+    maximum_frame_attempts: 8
+    # Only consecutive blocks at one unchanged DDS setting count as a lock.
+    required_passes: 5
+    # A wrong camera-alias seed must return to the wider 100 Hz search instead
+    # of spending the whole Task5 timeout on phase and amplitude trials.
+    high_frequency_confirmation_no_pass_blocks: 12
+    maximum_blocks: 40
+    confirmation_maximum_invalid_blocks: 3
+    maximum_corrections: 24
+    amplitude_deadband_div: 0.12
+    amplitude_proportional_gain: 0.35
+    amplitude_maximum_step: 3
+    # The phase estimator searches in four-code increments; a narrower
+    # deadband makes the controller chase changes it cannot observe.
+    phase_deadband: 4
+    phase_proportional_gain: 0.80
+    phase_maximum_step: 16
+    phase_trial_minimum_improvement: 0.005
+    amplitude_trial_minimum_improvement: 0.005
+    servo_span_error_full_scale_div: 2.0
+    # After initial lock, repeated same-direction phase work is integrated into
+    # the DDS word. This removes crystal frequency error instead of chasing it.
+    frequency_integral_gain: 0.80
+    frequency_integral_minimum_dt_s: 0.25
+    # Reject one-off vision noise: only repeated same-direction phase work
+    # is allowed to move the DDS tuning word.
+    frequency_integral_required_steps: 2
+    frequency_maximum_step_hz: 0.50
+    # Crystal compensation stays close to the selected contest 100 Hz grid.
+    frequency_maximum_total_correction_hz: 5.0
+    frequency_adjustment_deadband_hz: 0.005
+    maintenance_interval_s: 0.25
+    maintenance_warning_blocks: 4
+
+runtime:
+  settle_s: 0.18
+  aggregate_frames: 3
+  frame_interval_s: 0.025
+  preview: false
+
+# Legacy modular-detector settings retained for compatibility. The deployed
+# task5_cv_single.py controller uses target.circle_sweep/circle_lock above.
+circle_detection:
+  min_circularity: 0.75        # 最小圆度
+  good_circularity: 0.85       # 良好圆度
+  max_axis_ratio: 1.25         # 最大长短轴比
+  good_axis_ratio: 1.10        # 良好轴比
+  min_coverage: 0.70           # 最小轨迹覆盖率
+  good_coverage: 0.85          # 良好覆盖率
+  min_symmetry: 0.65           # 最小对称性
+  lock_quality_threshold: 75   # 锁定质量阈值
+
+frequency_scan:
+  step_hz: 100.0               # 扫描步进（100Hz）
+  initial_range_hz: 500.0      # 初始扫描范围
+  extended_range_hz: 1000.0    # 扩展扫描范围
+  max_scan_points: 20          # 最大扫描点数
+  min_quality_for_lock: 75     # 锁定最小质量
+  good_quality_threshold: 85   # 良好质量阈值
+  early_stop_quality: 90       # 提前停止扫描的质量阈值
+  dds_clock_hz: 50000000.0     # DDS时钟频率（50MHz）
+  scan_strategy: bidirectional # 扫描策略: bidirectional/sweep_up/fine_grid

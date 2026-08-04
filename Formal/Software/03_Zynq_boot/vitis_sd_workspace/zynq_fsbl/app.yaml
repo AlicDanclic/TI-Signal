@@ -1,0 +1,4 @@
+domain_path: E:\Apollo_LCD\vitis_sd_workspace\platform_sd\zynq_fsbl\zynq_fsbl_bsp
+app_src_dir: E:\Vitis2\2025.1\Vitis\data\embeddedsw\lib\sw_apps\zynq_fsbl
+template: zynq_fsbl
+lang: c

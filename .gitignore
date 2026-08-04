@@ -13,3 +13,5 @@ src/env/
 # simulink
 /Simulink/*
 !/Simulink/*.slx
+
+*.pm
